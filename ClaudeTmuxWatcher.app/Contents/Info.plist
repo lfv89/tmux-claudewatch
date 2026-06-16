@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key><string>ClaudeTmuxWatcher</string>
-  <key>CFBundleIdentifier</key><string>com.vee.claudetmuxwatcher</string>
+  <key>CFBundleIdentifier</key><string>works.vlabs.tmuxclaudewatcher</string>
   <key>CFBundleExecutable</key><string>ClaudeTmuxWatcher</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSUIElement</key><true/>

@@ -43,25 +43,28 @@ Quit from the menu-bar dropdown.
 
 ## Run at login (LaunchAgent)
 
+`build.sh` generates `works.vlabs.tmuxclaudewatcher.plist` with this checkout's absolute path baked
+in (launchd needs a literal path — it won't expand `~`/`$HOME`):
+
 ```sh
-cp com.vee.claudetmuxwatcher.plist ~/Library/LaunchAgents/
-launchctl load -w ~/Library/LaunchAgents/com.vee.claudetmuxwatcher.plist
+./build.sh
+cp works.vlabs.tmuxclaudewatcher.plist ~/Library/LaunchAgents/
+launchctl load -w ~/Library/LaunchAgents/works.vlabs.tmuxclaudewatcher.plist
 ```
 
 Stop / remove:
 
 ```sh
-launchctl unload -w ~/Library/LaunchAgents/com.vee.claudetmuxwatcher.plist
+launchctl unload -w ~/Library/LaunchAgents/works.vlabs.tmuxclaudewatcher.plist
 ```
 
-Logs go to `/tmp/claudetmuxwatcher.log`. If you move this directory, update the absolute path in the
-plist's `ProgramArguments`.
+Logs go to `/tmp/tmuxclaudewatcher.log`. If you move this directory, re-run `./build.sh` and copy the
+regenerated plist.
 
 ## Cycling through blocked panes
 
-- **Global hotkey** (from anywhere): default **⌃⌥⌘J** jumps to the next blocked pane. Change it in
-  **Settings…** (menu-bar dropdown) — click *Record Shortcut* and press the combo. Persisted in
-  `UserDefaults`.
+- **Global hotkeys** (from anywhere): **⌃⌥⌘J** jumps to the next *blocked* pane; **⌃⌥⌘N** cycles
+  through *every* Claude pane. Change the codes/modifiers near the top of `ClaudeTmuxWatcher.swift`.
 - **Inside tmux**: `tmux-next-blocked.sh` does the same, jumping to the next blocked pane *after*
   your current one. Bind it (this **overrides the default `prefix n` = next-window**):
 
