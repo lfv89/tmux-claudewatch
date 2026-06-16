@@ -389,17 +389,16 @@ class App: NSObject, NSApplicationDelegate {
         status.menu = menu
     }
 
-    /// Per-pane menu row: state glyph + tmux location, plus the question/age for waiting panes.
+    /// Per-pane menu row: "[session:window.pane] <message>" — the question for waiting
+    /// panes, "working…" for thinking, "idle" otherwise.
     func menuTitle(_ p: ClaudePane) -> String {
+        let message: String
         switch p.state {
-        case .waiting:
-            let age = waitingSince[p.id].map { " · \(elapsed(since: $0))" } ?? ""
-            return "\(WatcherIcon) \(p.label)\(age)  \(p.summary)"
-        case .thinking:
-            return "\(ThinkingIcon) \(p.label)  working…"
-        case .idle:
-            return "\(RobotEmoji) \(p.label)"
+        case .waiting:  message = p.summary
+        case .thinking: message = "working…"
+        case .idle:     message = "idle"
         }
+        return "[\(p.label)] \(message)"
     }
 
     /// A rounded "pill" badge holding a sequence of `emoji number` segments
