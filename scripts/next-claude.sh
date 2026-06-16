@@ -11,7 +11,10 @@ while IFS=$'\t' read -r s w p cmd; do
 done < <(tmux list-panes -a -F '#{session_name}	#{window_index}	#{pane_id}	#{pane_current_command}')
 
 n=${#pid[@]}
-[ "$n" -eq 0 ] && exit 0
+if [ "$n" -eq 0 ]; then
+  tmux display-message "tmux-claudewatch: no Claude panes"
+  exit 0
+fi
 
 cur=$(tmux display-message -p '#{pane_id}')
 target=0   # default: first Claude pane (when the current pane isn't a Claude one)

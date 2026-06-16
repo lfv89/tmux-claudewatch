@@ -14,7 +14,10 @@ while IFS=$'\t' read -r s w p; do
 done < <(tmux list-panes -a -F '#{session_name}	#{window_index}	#{pane_id}')
 
 n=${#pid[@]}
-[ "$n" -eq 0 ] && exit 0
+if [ "$n" -eq 0 ]; then
+  tmux display-message "tmux-claudewatch: no blocked Claude panes"
+  exit 0
+fi
 
 cur=$(tmux display-message -p '#{pane_id}')
 target=0   # default: first blocked pane (when current pane isn't itself blocked)
