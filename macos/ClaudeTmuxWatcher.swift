@@ -138,6 +138,8 @@ class App: NSObject, NSApplicationDelegate {
     let status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     var lastNotified: [String: Date] = [:]   // pane id -> last banner time (drives first alert + re-nudge)
     var waitingSince: [String: Date] = [:]    // pane id -> when it first showed waiting
+    var prevState: [String: PaneState] = [:]  // pane id -> state last poll, for "finished" detection
+    var pendingFinish: Set<String> = []       // went idle after thinking; confirm next poll before notifying
     var scanning = false                       // guard against overlapping background scans
     var lastCount = 0
     var lastThinking = 0
@@ -347,6 +349,24 @@ class App: NSObject, NSApplicationDelegate {
         }
         lastNotified = lastNotified.filter { current.contains($0.key) }
 
+        // "Finished" banner: a pane that was thinking settles into idle (debounced one poll to
+        // skip transient frames). thinking→waiting is covered by the waiting alert above.
+        for p in result.panes {
+            if p.state == .idle {
+                if pendingFinish.contains(p.id) {
+                    notifyFinished(p)
+                    pendingFinish.remove(p.id)
+                } else if prevState[p.id] == .thinking {
+                    pendingFinish.insert(p.id)
+                }
+            } else {
+                pendingFinish.remove(p.id)
+            }
+        }
+        let ids = Set(result.panes.map { $0.id })
+        prevState = Dictionary(uniqueKeysWithValues: result.panes.map { ($0.id, $0.state) })
+        pendingFinish = pendingFinish.filter { ids.contains($0) }
+
         render(result.panes)
         if hasNew { startPulse() }
     }
@@ -478,6 +498,18 @@ class App: NSObject, NSApplicationDelegate {
             "-subtitle", p.label,
             "-message", p.summary,
             "-group", "claudy-\(p.id)",
+            "-execute", switchCommand(p),
+        ])
+    }
+
+    /// Banner when a pane finishes working (thinking → idle) and is back to you.
+    func notifyFinished(_ p: ClaudePane) {
+        guard FileManager.default.isExecutableFile(atPath: NOTIFIER) else { return }
+        run(NOTIFIER, [
+            "-title", "Claude finished",
+            "-subtitle", p.label,
+            "-message", "Done — back to you",
+            "-group", "claudy-done-\(p.id)",
             "-execute", switchCommand(p),
         ])
     }
