@@ -16,7 +16,7 @@ if [ "${CW_POPUP:-}" = "1" ]; then
             --padding=0 --prompt='  ' --pointer='▶' --marker='▏' \
             --info=hidden --no-scrollbar \
             --preview 'tmux capture-pane -ep -S -300 -t {2} | tail -n "$FZF_PREVIEW_LINES"' \
-            --preview-window='down,70%,border-top' \
+            --preview-window='up,70%,border-bottom' \
             --color="$FZF_COLORS" < "$CW_ROWS") || exit 0
   [ -z "$sel" ] && exit 0
   pid=$(printf '%s' "$sel" | cut -f2)
