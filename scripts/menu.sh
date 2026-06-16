@@ -66,8 +66,8 @@ fi
 n=$(wc -l < "$tmp" | tr -d ' ')
 ch=$(tmux display-message -p '#{client_height}')
 h=$(( n + 6 ))                                   # rows + border/label/prompt/padding
-[ "$h" -lt 16 ] && h=16                           # floor so the preview stays readable
+[ "$h" -lt 28 ] && h=28                           # floor so the preview has room
 max=$(( ch * 90 / 100 )); [ "$h" -gt "$max" ] && h=$max
 
-tmux display-popup -E -b none -x C -y C -w 80% -h "$h" \
+tmux display-popup -E -b none -x C -y C -w 90% -h "$h" \
   -e CW_POPUP=1 -e "CW_ROWS=$tmp" "$SELF"
