@@ -13,7 +13,7 @@ if [ "${CW_POPUP:-}" = "1" ]; then
   trap 'rm -f "$CW_ROWS"' EXIT
   sel=$(fzf --ansi --delimiter=$'\t' --with-nth=5 \
             --layout=default --border=rounded \
-            --padding=1,1,0,1 --prompt='  ' --pointer='▶' --marker='▏' \
+            --padding=0 --prompt='  ' --pointer='▶' --marker='▏' \
             --info=hidden --no-scrollbar \
             --preview 'tmux capture-pane -ep -t {2}' \
             --preview-window='right,55%,border-left' \
