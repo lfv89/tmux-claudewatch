@@ -12,7 +12,7 @@ done < <(tmux list-panes -a -F '#{session_name}	#{window_index}	#{pane_id}	#{pan
 
 n=${#pid[@]}
 if [ "$n" -eq 0 ]; then
-  tmux display-message "#[align=absolute-centre]No Claude panes"
+  tmux display-message "#[align=absolute-centre]there are no Claude panes"
   exit 0
 fi
 
