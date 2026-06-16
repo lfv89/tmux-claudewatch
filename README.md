@@ -81,10 +81,9 @@ This builds the app and registers a LaunchAgent (starts at login). Re-run after 
 
 - **Menu-bar pill** — `🤖<total>` always, plus `🔔<waiting>` / `⚙️<thinking>` when non-zero. The
   dropdown lists every Claude pane; click one to jump (and raise the terminal).
-- **Notifications** — fire when a pane enters the waiting state (needs `terminal-notifier`:
-  `brew install terminal-notifier`), re-nudging every few minutes while still waiting. A
-  separate "Claude finished" banner fires when a pane goes from thinking back to idle — i.e.
-  it completed what you asked. Clicking either jumps to the pane.
+- **Notifications** — fire once when a pane **enters the waiting state**, showing the prompt
+  question; clicking the banner jumps to the pane. Needs `terminal-notifier`
+  (`brew install terminal-notifier`).
 - **Global hotkeys** — `⌃⌥⌘J` next waiting pane, `⌃⌥⌘N` next Claude pane (any state). Change the
   codes near the top of `macos/ClaudeTmuxWatcher.swift`.
 

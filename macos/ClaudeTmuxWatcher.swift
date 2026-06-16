@@ -137,9 +137,6 @@ func summarize(_ content: String) -> String {
 class App: NSObject, NSApplicationDelegate {
     let status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     var lastNotified: [String: Date] = [:]   // pane id -> last banner time (drives first alert + re-nudge)
-    var waitingSince: [String: Date] = [:]    // pane id -> when it first showed waiting
-    var prevState: [String: PaneState] = [:]  // pane id -> state last poll, for "finished" detection
-    var pendingFinish: Set<String> = []       // went idle after thinking; confirm next poll before notifying
     var scanning = false                       // guard against overlapping background scans
     var lastCount = 0
     var lastThinking = 0
@@ -329,43 +326,17 @@ class App: NSObject, NSApplicationDelegate {
         let waiting = result.waiting
         lastThinking = result.thinking
         lastClaude = result.claude
-        let now = Date()
         let current = Set(waiting.map { $0.id })
 
-        // First-seen time per waiting pane drives the "waiting Nm" label; drop cleared ones.
-        for p in waiting where waitingSince[p.id] == nil { waitingSince[p.id] = now }
-        waitingSince = waitingSince.filter { current.contains($0.key) }
-
-        // Banner + pulse on the first transition, then re-nudge every `reNudge`s while still waiting.
-        let reNudge: TimeInterval = 180
+        // Banner + pulse once per *new* waiting state — when a pane first enters waiting.
+        // (No re-nudge; a pane that leaves and re-enters waiting notifies again.)
         var hasNew = false
-        for p in waiting {
-            let last = lastNotified[p.id]
-            if last == nil || now.timeIntervalSince(last!) >= reNudge {
-                notify(p)
-                lastNotified[p.id] = now
-                if last == nil { hasNew = true }
-            }
+        for p in waiting where lastNotified[p.id] == nil {
+            notify(p)
+            lastNotified[p.id] = Date()
+            hasNew = true
         }
         lastNotified = lastNotified.filter { current.contains($0.key) }
-
-        // "Finished" banner: a pane that was thinking settles into idle (debounced one poll to
-        // skip transient frames). thinking→waiting is covered by the waiting alert above.
-        for p in result.panes {
-            if p.state == .idle {
-                if pendingFinish.contains(p.id) {
-                    notifyFinished(p)
-                    pendingFinish.remove(p.id)
-                } else if prevState[p.id] == .thinking {
-                    pendingFinish.insert(p.id)
-                }
-            } else {
-                pendingFinish.remove(p.id)
-            }
-        }
-        let ids = Set(result.panes.map { $0.id })
-        prevState = Dictionary(uniqueKeysWithValues: result.panes.map { ($0.id, $0.state) })
-        pendingFinish = pendingFinish.filter { ids.contains($0) }
 
         render(result.panes)
         if hasNew { startPulse() }
@@ -502,18 +473,6 @@ class App: NSObject, NSApplicationDelegate {
         ])
     }
 
-    /// Banner when a pane finishes working (thinking → idle) and is back to you.
-    func notifyFinished(_ p: ClaudePane) {
-        guard FileManager.default.isExecutableFile(atPath: NOTIFIER) else { return }
-        run(NOTIFIER, [
-            "-title", "Claude finished",
-            "-subtitle", p.label,
-            "-message", "Done — back to you",
-            "-group", "claudy-done-\(p.id)",
-            "-execute", switchCommand(p),
-        ])
-    }
-
     /// Shell command that focuses the pane within tmux.
     func switchCommand(_ p: ClaudePane) -> String {
         "\(TMUX) switch-client -t '\(p.session)' ; "
@@ -547,14 +506,6 @@ class App: NSObject, NSApplicationDelegate {
             if ppid <= 1 { return }
             pid = ppid
         }
-    }
-
-    /// Compact human duration: "8s", "4m", "1h12m".
-    func elapsed(since: Date) -> String {
-        let s = Int(Date().timeIntervalSince(since))
-        if s < 60 { return "\(s)s" }
-        if s < 3600 { return "\(s / 60)m" }
-        return "\(s / 3600)h\((s % 3600) / 60)m"
     }
 
     @objc func switchTo(_ sender: NSMenuItem) {
