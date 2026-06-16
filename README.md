@@ -42,10 +42,10 @@ Then hit `prefix + I` to fetch the plugin.
 
 - **Status segment** — `#{claudewatch}` expands to `󰚩 <total> 󰒓 <thinking> 󰂚 <waiting>`. Prints
   nothing when no Claude panes are running.
-- **Keys**:
-  - `prefix n` → cycle through **every** Claude pane (any state)
-  - `prefix N` → cycle through **waiting** panes only
-  - `prefix t` → **fzf popup** listing every Claude session with its state; pick one to jump
+- **Keys** (unbound by default — bind them via the options below):
+  - cycle through **every** Claude pane (any state)
+  - cycle through **waiting** panes only
+  - **fzf popup** listing every Claude session with its state; pick one to jump
     (the macOS dropdown, inside tmux — needs `fzf`)
 - **Pane-border tag** — each Claude pane gets a `@claude_waiting` option (`1` when waiting, else
   `0`), so you can restyle the active pane's border, e.g.:
@@ -60,11 +60,17 @@ Then hit `prefix + I` to fetch the plugin.
 | Option | Default | Meaning |
 |---|---|---|
 | `@claudewatch_format` | `#(…/scripts/claude-count.sh)` | Override the status segment command. |
-| `@claudewatch_jump_key` | `n` | Key (under prefix) to cycle all Claude panes. Empty = unbound. |
-| `@claudewatch_jump_waiting_key` | `N` | Key (under prefix) to cycle waiting panes. Empty = unbound. |
-| `@claudewatch_menu_key` | `t` | Key (under prefix) to open the fzf popup picker. Empty = unbound. |
+| `@claudewatch_jump_key` | _(unset)_ | Key (under prefix) to cycle all Claude panes. Unset = unbound. |
+| `@claudewatch_jump_waiting_key` | _(unset)_ | Key (under prefix) to cycle waiting panes. Unset = unbound. |
+| `@claudewatch_menu_key` | _(unset)_ | Key (under prefix) to open the fzf popup picker. Unset = unbound. |
 
-> `prefix n` overrides tmux's default `next-window`. Set `@claudewatch_jump_key ''` to keep it.
+The keys are **unbound by default** — set the options to bind them, e.g.:
+
+```tmux
+set -g @claudewatch_jump_key 'n'          # note: overrides tmux's default next-window
+set -g @claudewatch_jump_waiting_key 'N'
+set -g @claudewatch_menu_key 't'
+```
 
 ---
 
