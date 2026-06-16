@@ -45,8 +45,9 @@ Then hit `prefix + I` to fetch the plugin.
 - **Keys**:
   - `prefix n` → cycle through **every** Claude pane (any state)
   - `prefix N` → cycle through **waiting** panes only
-  - `prefix t` → **fzf popup** listing every Claude session with its state; pick one to jump
-    (the macOS dropdown, inside tmux — needs `fzf`)
+  - `prefix t` → **fzf popup** listing every Claude session with its state and a live
+    preview; pick one to open it in a **live, interactive overlay** (answer the agent in
+    place, then `prefix d` to return). Needs `fzf`.
 - **Pane-border tag** — each Claude pane gets a `@claude_waiting` option (`1` when waiting, else
   `0`), so you can restyle the active pane's border, e.g.:
 

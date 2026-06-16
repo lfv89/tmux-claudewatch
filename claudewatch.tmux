@@ -4,8 +4,8 @@
 #   1. The status segment — replaces a #{claudewatch} token in status-left/right with
 #      a call to scripts/claude-count.sh (same idiom as tmux-containers' #{containers}).
 #   2. The keys — `prefix n` cycles every Claude pane, `prefix N` cycles only the waiting
-#      ones, `prefix t` opens an fzf popup of all of them. All configurable; set the
-#      option empty to leave a key unbound.
+#      ones, `prefix t` opens an fzf popup of all of them (selecting one opens it live in
+#      an overlay). All configurable; set the option empty to leave a key unbound.
 
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
