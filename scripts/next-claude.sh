@@ -1,6 +1,6 @@
 #!/bin/bash
 # Switch tmux focus to the next Claude pane after the current one (wrapping), in any
-# state — blocked, thinking, or idle. A Claude pane is one whose foreground command is
+# state — waiting, thinking, or idle. A Claude pane is one whose foreground command is
 # `claude`. Bound to `prefix n` by the plugin (see claudewatch.tmux).
 set -euo pipefail
 

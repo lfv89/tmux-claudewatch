@@ -1,8 +1,8 @@
 // ClaudeTmuxWatcher — a menu-bar agent that flags tmux panes where a Claude
-// session is blocked on you (a permission / decision prompt).
+// session is waiting on you (a permission / decision prompt).
 //
-// Detection is content-based (the pane title cannot distinguish "blocked" from
-// "busy"): a pane is BLOCKED when its visible content shows a numbered
+// Detection is content-based (the pane title cannot distinguish "waiting" from
+// "busy"): a pane is WAITING when its visible content shows a numbered
 // selection menu (`❯ 1. …`) together with the dialog footer `Esc to cancel`.
 // The idle `❯ ` prompt and the working spinner are deliberately ignored.
 
@@ -37,7 +37,7 @@ func run(_ launchPath: String, _ args: [String]) -> String {
 
 // MARK: - Detection
 
-enum PaneState { case blocked, thinking, idle }
+enum PaneState { case waiting, thinking, idle }
 
 struct ClaudePane {
     let id: String          // tmux %id, stable across scans
@@ -45,7 +45,7 @@ struct ClaudePane {
     let session: String
     let window: String      // session:window_index target
     let state: PaneState
-    let summary: String     // blocked: the question line; otherwise the label
+    let summary: String     // waiting: the question line; otherwise the label
 }
 
 /// Regex: a caret-selected numbered menu item with text, e.g. "❯ 1. Yes".
@@ -57,7 +57,7 @@ let thinkingRegex = try! NSRegularExpression(pattern: "\\(\\d+.*tokens?\\)")
 // "exclamationmark", "bubble.left.fill", "checkmark.circle", etc.
 // All emoji, so they render consistently (SF Symbols has no robot glyph).
 let RobotEmoji = "🤖"
-let WatcherIcon = "🔔"     // blocked: needs your answer
+let WatcherIcon = "🔔"     // waiting: needs your answer
 let ThinkingIcon = "⚙️"    // thinking: robot + gear
 let IdleIcon = ""          // idle: robot only
 let BadgeHeight: CGFloat = 19                                                   // pill height (bump to make bigger)
@@ -67,17 +67,17 @@ let IdleColor = NSColor(srgbRed: 0.20, green: 0.78, blue: 0.35, alpha: 1)       
 let IdleFg = NSColor.white                                                      // white check
 let ThinkingColor = NSColor(srgbRed: 0.31, green: 0.51, blue: 0.85, alpha: 1)   // blue "working" pill
 
-// Global hotkey to cycle focus through blocked panes. Default ⌃⌥⌘J; ⌃⌥⌘N cycles
+// Global hotkey to cycle focus through waiting panes. Default ⌃⌥⌘J; ⌃⌥⌘N cycles
 // through every Claude pane. Change HotKeyCode to any kVK_ANSI_* (e.g. kVK_ANSI_K),
 // and HotKeyMods to any combo of controlKey / optionKey / cmdKey / shiftKey.
 let HotKeyCode = UInt32(kVK_ANSI_J)
 let HotKeyMods = UInt32(controlKey | optionKey | cmdKey)
-// Second hotkey: same modifiers + N cycles through *every* Claude pane, not just blocked ones.
+// Second hotkey: same modifiers + N cycles through *every* Claude pane, not just waiting ones.
 let AllHotKeyCode = UInt32(kVK_ANSI_N)
 
 struct ScanResult {
     var panes: [ClaudePane] = []
-    var blocked: [ClaudePane] { panes.filter { $0.state == .blocked } }
+    var waiting: [ClaudePane] { panes.filter { $0.state == .waiting } }
     var thinking: Int { panes.filter { $0.state == .thinking }.count }
     var claude: Int { panes.count }
 }
@@ -95,7 +95,7 @@ func scan() -> ScanResult {
         guard cmd == "claude" else { continue }
 
         let content = run(TMUX, ["capture-pane", "-p", "-t", paneId])
-        let state: PaneState = isBlocked(content) ? .blocked
+        let state: PaneState = isWaiting(content) ? .waiting
                              : isThinking(content) ? .thinking : .idle
         result.panes.append(ClaudePane(
             id: paneId,
@@ -103,13 +103,13 @@ func scan() -> ScanResult {
             session: session,
             window: "\(session):\(win)",
             state: state,
-            summary: state == .blocked ? summarize(content) : "\(session):\(win).\(pane)"
+            summary: state == .waiting ? summarize(content) : "\(session):\(win).\(pane)"
         ))
     }
     return result
 }
 
-func isBlocked(_ content: String) -> Bool {
+func isWaiting(_ content: String) -> Bool {
     guard content.contains("Esc to cancel") else { return false }
     let range = NSRange(content.startIndex..., in: content)
     return menuRegex.firstMatch(in: content, range: range) != nil
@@ -137,14 +137,14 @@ func summarize(_ content: String) -> String {
 class App: NSObject, NSApplicationDelegate {
     let status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     var lastNotified: [String: Date] = [:]   // pane id -> last banner time (drives first alert + re-nudge)
-    var blockedSince: [String: Date] = [:]    // pane id -> when it first showed blocked
+    var waitingSince: [String: Date] = [:]    // pane id -> when it first showed waiting
     var scanning = false                       // guard against overlapping background scans
     var lastCount = 0
     var lastThinking = 0
     var lastClaude = 0
     var pulseTimer: Timer?
     var pulseBright = false
-    var blockedPanes: [ClaudePane] = []    // blocked subset, for J-cycle + notifications
+    var waitingPanes: [ClaudePane] = []    // waiting subset, for J-cycle + notifications
     var allPanes: [ClaudePane] = []         // every Claude pane, for N-cycle + the menu
     var cycleIndex = -1
     var allCycleIndex = -1
@@ -219,14 +219,14 @@ class App: NSObject, NSApplicationDelegate {
                             EventHotKeyID(signature: sig, id: 2), GetApplicationEventTarget(), 0, &allHotKeyRef)
     }
 
-    /// Advance to the next blocked pane and switch tmux focus to it.
+    /// Advance to the next waiting pane and switch tmux focus to it.
     func cycleNext() {
-        guard !blockedPanes.isEmpty else { return }
-        cycleIndex = (cycleIndex + 1) % blockedPanes.count
-        focus(blockedPanes[cycleIndex])
+        guard !waitingPanes.isEmpty else { return }
+        cycleIndex = (cycleIndex + 1) % waitingPanes.count
+        focus(waitingPanes[cycleIndex])
     }
 
-    /// Advance through every Claude pane (blocked, thinking, or idle) and focus it.
+    /// Advance through every Claude pane (waiting, thinking, or idle) and focus it.
     func cycleAllClaude() {
         guard !allPanes.isEmpty else { return }
         allCycleIndex = (allCycleIndex + 1) % allPanes.count
@@ -243,7 +243,7 @@ class App: NSObject, NSApplicationDelegate {
             w.isReleasedWhenClosed = false
             let v = w.contentView!
 
-            let caption = NSTextField(labelWithString: "Cycle-through-blockers shortcut:")
+            let caption = NSTextField(labelWithString: "Cycle-through-waiting shortcut:")
             caption.frame = NSRect(x: 20, y: 108, width: 320, height: 18)
             v.addSubview(caption)
 
@@ -324,20 +324,20 @@ class App: NSObject, NSApplicationDelegate {
     }
 
     func apply(_ result: ScanResult) {
-        let blocked = result.blocked
+        let waiting = result.waiting
         lastThinking = result.thinking
         lastClaude = result.claude
         let now = Date()
-        let current = Set(blocked.map { $0.id })
+        let current = Set(waiting.map { $0.id })
 
-        // First-seen time per blocked pane drives the "blocked Nm" label; drop cleared ones.
-        for p in blocked where blockedSince[p.id] == nil { blockedSince[p.id] = now }
-        blockedSince = blockedSince.filter { current.contains($0.key) }
+        // First-seen time per waiting pane drives the "waiting Nm" label; drop cleared ones.
+        for p in waiting where waitingSince[p.id] == nil { waitingSince[p.id] = now }
+        waitingSince = waitingSince.filter { current.contains($0.key) }
 
-        // Banner + pulse on the first transition, then re-nudge every `reNudge`s while still blocked.
+        // Banner + pulse on the first transition, then re-nudge every `reNudge`s while still waiting.
         let reNudge: TimeInterval = 180
         var hasNew = false
-        for p in blocked {
+        for p in waiting {
             let last = lastNotified[p.id]
             if last == nil || now.timeIntervalSince(last!) >= reNudge {
                 notify(p)
@@ -352,17 +352,17 @@ class App: NSObject, NSApplicationDelegate {
     }
 
     func render(_ panes: [ClaudePane]) {
-        // Attention first: blocked, then thinking, then idle; stable within each group.
-        let rank: [PaneState: Int] = [.blocked: 0, .thinking: 1, .idle: 2]
+        // Attention first: waiting, then thinking, then idle; stable within each group.
+        let rank: [PaneState: Int] = [.waiting: 0, .thinking: 1, .idle: 2]
         let sorted = panes.enumerated()
             .sorted { (rank[$0.element.state]!, $0.offset) < (rank[$1.element.state]!, $1.offset) }
             .map { $0.element }
 
         allPanes = sorted
-        blockedPanes = sorted.filter { $0.state == .blocked }
-        if blockedPanes.isEmpty { cycleIndex = -1 }   // restart cycling from the top next time
+        waitingPanes = sorted.filter { $0.state == .waiting }
+        if waitingPanes.isEmpty { cycleIndex = -1 }   // restart cycling from the top next time
         if sorted.isEmpty { allCycleIndex = -1 }
-        lastCount = blockedPanes.count
+        lastCount = waitingPanes.count
         updateBadge()
 
         let menu = NSMenu()
@@ -389,11 +389,11 @@ class App: NSObject, NSApplicationDelegate {
         status.menu = menu
     }
 
-    /// Per-pane menu row: state glyph + tmux location, plus the question/age for blocked panes.
+    /// Per-pane menu row: state glyph + tmux location, plus the question/age for waiting panes.
     func menuTitle(_ p: ClaudePane) -> String {
         switch p.state {
-        case .blocked:
-            let age = blockedSince[p.id].map { " · \(elapsed(since: $0))" } ?? ""
+        case .waiting:
+            let age = waitingSince[p.id].map { " · \(elapsed(since: $0))" } ?? ""
             return "\(WatcherIcon) \(p.label)\(age)  \(p.summary)"
         case .thinking:
             return "\(ThinkingIcon) \(p.label)  working…"
@@ -441,19 +441,19 @@ class App: NSObject, NSApplicationDelegate {
         guard let button = status.button else { return }
         button.attributedTitle = NSAttributedString(string: "")
 
-        // 🤖 total Claude panes always leads; then 🔔 blocked, ⚙️ thinking when non-zero.
+        // 🤖 total Claude panes always leads; then 🔔 waiting, ⚙️ thinking when non-zero.
         var segs: [(emoji: String, count: Int?)] = [(RobotEmoji, lastClaude)]
         if lastCount > 0    { segs.append((WatcherIcon, lastCount)) }
         if lastThinking > 0 { segs.append((ThinkingIcon, lastThinking)) }
 
-        // Background follows the highest-priority active state; terracotta pulses on a new block.
+        // Background follows the highest-priority active state; terracotta pulses when a pane starts waiting.
         let bg = lastCount > 0    ? (pulseBright ? BadgePulseColor : BadgeColor)
                : lastThinking > 0 ? ThinkingColor
                :                    IdleColor
         button.image = pill(segs, bg: bg, fg: .white)
     }
 
-    /// Flash the badge between red and orange for ~1.5s on a new block.
+    /// Flash the badge between red and orange for ~1.5s when a pane starts waiting.
     func startPulse() {
         pulseTimer?.invalidate()
         var ticks = 0
