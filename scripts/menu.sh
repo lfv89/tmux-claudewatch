@@ -64,13 +64,17 @@ if [ ! -s "$tmp" ]; then
 fi
 
 # Width adapts to the widest Claude pane (its column count = the preview content width),
-# plus the rounded border, capped at the client width.
+# plus the rounded border — but capped at 120 cols so a full-width pane doesn't fill the
+# screen, and never wider than the client.
 cw=$(tmux display-message -p '#{client_width}')
 maxw=0
 while IFS=$'\t' read -r cmd pw; do
   [ "$cmd" = "claude" ] && [ "$pw" -gt "$maxw" ] && maxw=$pw
 done < <(tmux list-panes -a -F '#{pane_current_command}	#{pane_width}')
-w=$(( maxw + 4 )); [ "$w" -gt "$cw" ] && w=$cw; [ "$w" -lt 40 ] && w=40
+w=$(( maxw + 4 ))
+[ "$w" -gt 120 ] && w=120
+[ "$w" -gt "$cw" ] && w=$cw
+[ "$w" -lt 40 ] && w=40
 
 tmux display-popup -E -b none -x C -y C -w "$w" -h 75% \
   -e CW_POPUP=1 -e "CW_ROWS=$tmp" "$SELF"
