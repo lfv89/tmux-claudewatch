@@ -15,7 +15,7 @@ done < <(tmux list-panes -a -F '#{session_name}	#{window_index}	#{pane_id}')
 
 n=${#pid[@]}
 if [ "$n" -eq 0 ]; then
-  tmux display-message "tmux-claudewatch: no blocked Claude panes"
+  tmux display-message "#[align=absolute-centre]No blocked Claude panes"
   exit 0
 fi
 
