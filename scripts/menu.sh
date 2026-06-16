@@ -15,7 +15,7 @@ if [ "${CW_POPUP:-}" = "1" ]; then
             --layout=default --border=rounded \
             --padding=0 --prompt='  ' --pointer='▶' --marker='▏' \
             --info=hidden --no-scrollbar \
-            --preview 'tmux capture-pane -ep -S -300 -t {2} | tail -n "${FZF_PREVIEW_LINES:-50}"' \
+            --preview 'tmux capture-pane -ep -S -300 -t {2} | tail -n "$FZF_PREVIEW_LINES"' \
             --preview-window='right,55%,border-left' \
             --color="$FZF_COLORS" < "$CW_ROWS") || exit 0
   [ -z "$sel" ] && exit 0
