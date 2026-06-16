@@ -39,8 +39,7 @@ main() {
   menu_key="$(get_tmux_option @claudewatch_menu_key t)"           # fzf popup of all panes
   [ -n "$jump_key" ]    && tmux bind-key "$jump_key"    run-shell "$CURRENT_DIR/scripts/next-claude.sh"
   [ -n "$waiting_key" ] && tmux bind-key "$waiting_key" run-shell "$CURRENT_DIR/scripts/next-waiting.sh"
-  [ -n "$menu_key" ]    && tmux bind-key "$menu_key" \
-      display-popup -x C -y C -w 80% -h 60% -b rounded -E "$CURRENT_DIR/scripts/menu.sh"
+  [ -n "$menu_key" ]    && tmux bind-key "$menu_key" run-shell -b "$CURRENT_DIR/scripts/menu.sh"
 }
 
 main
