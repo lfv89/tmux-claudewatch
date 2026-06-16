@@ -12,7 +12,7 @@ FZF_COLORS="bg:#2E3440,fg:#D8DEE9,hl:#88C0D0,bg+:#3B4252,fg+:#ECEFF4,hl+:#5E81AC
 if [ "${CW_POPUP:-}" = "1" ]; then
   trap 'rm -f "$CW_ROWS"' EXIT
   sel=$(fzf --ansi --delimiter=$'\t' --with-nth=5 \
-            --layout=reverse-list --border=rounded --border-label=' Claude sessions ' \
+            --layout=reverse --border=rounded --border-label=' Claude sessions ' \
             --padding=1 --prompt='  ' --pointer='▶' --marker='▏' \
             --info=hidden --no-scrollbar \
             --preview 'tmux capture-pane -ep -t {2}' \
