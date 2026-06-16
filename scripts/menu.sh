@@ -42,16 +42,16 @@ rows() {
     c=$(tmux capture-pane -p -t "$p" 2>/dev/null) || c=""
     if printf '%s' "$c" | grep -q 'Esc to cancel' \
        && printf '%s' "$c" | grep -qE '❯[[:space:]]*[0-9]+\.[[:space:]]+[^[:space:]]'; then
-      rank=0
+      rank=0; icon="🔔"
       detail=$(printf '%s\n' "$c" | sed 's/[[:space:]]*$//' \
                  | grep -E '^(Do you want|Would you like)|\?$' | tail -1 | sed 's/^[[:space:]]*//')
       [ -z "$detail" ] && detail="needs a decision"
     elif printf '%s' "$c" | grep -qiE 'esc to interrupt|\([0-9].*tokens?\)'; then
-      rank=1; detail="working…"
+      rank=1; icon="⚙️"; detail="working…"
     else
-      rank=2; detail="idle"
+      rank=2; icon="🤖"; detail="idle"
     fi
-    printf '%d\t%s\t%s\t%s\t[%s:%s.%s] %s\n' "$rank" "$p" "$s" "$w" "$s" "$w" "$pi" "$detail"
+    printf '%d\t%s\t%s\t%s\t%s [%s:%s.%s] %s\n' "$rank" "$p" "$s" "$w" "$icon" "$s" "$w" "$pi" "$detail"
   done < <(tmux list-panes -a -F '#{session_name}	#{window_index}	#{pane_index}	#{pane_id}	#{pane_current_command}')
 }
 
