@@ -14,7 +14,7 @@ if [ "${CW_POPUP:-}" = "1" ]; then
   sel=$(fzf --ansi --delimiter=$'\t' --with-nth=5 \
             --layout=reverse-list --border=rounded \
             --padding=1 --prompt='  ' --pointer='▶' --marker='▏' \
-            --info=hidden --no-separator --no-scrollbar \
+            --info=hidden --no-scrollbar \
             --preview 'tmux capture-pane -ep -t {2}' \
             --preview-window='right,55%,border-left' \
             --color="$FZF_COLORS" < "$CW_ROWS") || exit 0
