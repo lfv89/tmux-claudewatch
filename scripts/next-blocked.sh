@@ -1,9 +1,7 @@
 #!/bin/bash
-# Switch tmux focus to the next Claude-blocked pane after the current one (wrapping).
-# Same detection as ClaudeTmuxWatcher: a numbered selection menu ("❯ 1. …") plus
-# the dialog footer "Esc to cancel".
-#
-# Bind in tmux.conf, e.g.:   bind n run-shell '/path/to/tmux-claudewatch/tmux-next-blocked.sh'
+# Switch tmux focus to the next Claude-*blocked* pane after the current one (wrapping).
+# Same detection as the macOS app: a numbered selection menu ("❯ 1. …") plus the dialog
+# footer "Esc to cancel". Bound to `prefix N` by the plugin (see claudewatch.tmux).
 set -euo pipefail
 
 sess=(); win=(); pid=()

@@ -2,7 +2,8 @@
 # Emits a tmux status segment for Claude sessions: robot + total, gear + thinking,
 # bell + blocked. "blocked" = sitting on a permission/decision prompt; "thinking" =
 # actively processing (spinner/timer line). Nothing is printed when total is 0.
-# Meant for status-right:  #(/path/to/tmux-claudewatch/claudy-count.sh)
+# Wired into status-right via the plugin's #{claudewatch} token (see claudewatch.tmux);
+# also tags each pane with @claude_blocked for pane-border-format styling.
 set -euo pipefail
 
 total=0

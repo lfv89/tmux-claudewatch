@@ -1,85 +1,102 @@
-# ClaudeTmuxWatcher
+# tmux-claudewatch
 
-A tiny macOS menu-bar agent that tells you when a **Claude session in a tmux pane is blocked
-waiting on you** — i.e. sitting on a permission / decision prompt
-(`Do you want to make this edit…? ❯ 1. Yes / 2. … / 3. No`).
+See, at a glance, which **Claude Code sessions across your tmux panes need you** — and jump
+straight to them.
 
-- **Menu-bar icon** shows a count of currently-blocked panes; the dropdown lists each one with its
-  question. Click a row to switch tmux focus to that pane.
-- **Notification banner** fires once each time a pane *enters* the blocked state (via
-  `terminal-notifier`); clicking the banner also switches to the pane.
+A pane is **blocked** when Claude is sitting on a permission / decision prompt
+(`Do you want to make this edit…? ❯ 1. Yes / 2. … / 3. No`), **thinking** when it's actively
+working (spinner/token line), or **idle** otherwise.
 
-It is *blocked-only* by design: panes that are actively working (spinner) or idle at an empty
-`❯` prompt are not flagged.
+The repo ships two independent pieces:
 
-## How detection works
+| | What | Needs |
+|---|---|---|
+| **tmux plugin** (baseline) | A status-bar segment with live counts (󰚩 total · 󰒓 thinking · 󰂚 blocked) and keys to jump between Claude panes. | just tmux |
+| **macOS menu-bar app** (optional) | A menu-bar pill + notifications that alert you when a pane *enters* the blocked state, even when tmux isn't on screen. | macOS + Swift toolchain |
 
-Pane titles can't tell "blocked" from "busy" (both show `✳`), so detection reads pane **content**:
-a pane is blocked when `tmux capture-pane` shows a numbered selection menu (`❯ 1. …`) together with
-the dialog footer `Esc to cancel`. Polled every 2s. No tmux/Claude config or hooks required — it
-works for any pane.
+Detection is content-based (`tmux capture-pane`): a numbered selection menu (`❯ 1. …`) plus the
+footer `Esc to cancel` means blocked; `esc to interrupt` / a `(… tokens)` line means thinking. No
+Claude or tmux hooks required.
 
-## Requirements
+---
 
-- `tmux`, `terminal-notifier` (`brew install terminal-notifier`), and the Swift toolchain (Xcode
-  command-line tools) for building.
+## tmux plugin
 
-## Build
+### Install (TPM)
 
-```sh
-./build.sh          # -> ./ClaudeTmuxWatcher
-./build.sh --app    # also -> ./ClaudeTmuxWatcher.app (for Login Items, if you prefer)
+Add to `~/.tmux.conf`:
+
+```tmux
+set -g @plugin 'lfv89/tmux-claudewatch'
 ```
 
-## Run
+Put the status token wherever you want the segment to appear:
 
-Foreground (for a quick try):
-
-```sh
-./ClaudeTmuxWatcher
+```tmux
+set -g status-right "#{claudewatch} %H:%M"
 ```
 
-Quit from the menu-bar dropdown.
+Then hit `prefix + I` to fetch the plugin.
 
-## Run at login (LaunchAgent)
+### What you get
 
-`build.sh` generates `works.vlabs.tmuxclaudewatcher.plist` with this checkout's absolute path baked
-in (launchd needs a literal path — it won't expand `~`/`$HOME`):
-
-```sh
-./build.sh
-cp works.vlabs.tmuxclaudewatcher.plist ~/Library/LaunchAgents/
-launchctl load -w ~/Library/LaunchAgents/works.vlabs.tmuxclaudewatcher.plist
-```
-
-Stop / remove:
-
-```sh
-launchctl unload -w ~/Library/LaunchAgents/works.vlabs.tmuxclaudewatcher.plist
-```
-
-Logs go to `/tmp/tmuxclaudewatcher.log`. If you move this directory, re-run `./build.sh` and copy the
-regenerated plist.
-
-## Cycling through blocked panes
-
-- **Global hotkeys** (from anywhere): **⌃⌥⌘J** jumps to the next *blocked* pane; **⌃⌥⌘N** cycles
-  through *every* Claude pane. Change the codes/modifiers near the top of `ClaudeTmuxWatcher.swift`.
-- **Inside tmux**: `tmux-next-blocked.sh` does the same, jumping to the next blocked pane *after*
-  your current one. Bind it (this **overrides the default `prefix n` = next-window**):
+- **Status segment** — `#{claudewatch}` expands to `󰚩 <total> 󰒓 <thinking> 󰂚 <blocked>`. Prints
+  nothing when no Claude panes are running.
+- **Jump keys**:
+  - `prefix n` → cycle through **every** Claude pane (any state)
+  - `prefix N` → cycle through **blocked** panes only
+- **Pane-border tag** — each Claude pane gets a `@claude_blocked` option (`1` when blocked, else
+  `0`), so you can restyle the active pane's border, e.g.:
 
   ```tmux
-  # ~/.tmux.conf
-  bind n run-shell '/path/to/tmux-claudewatch/tmux-next-blocked.sh'
+  set -g pane-border-status top
+  set -g pane-border-format "#{?#{==:#{@claude_blocked},1},#[bg=red] waiting ,#{pane_current_command}}"
   ```
 
-  Reload with `tmux source-file ~/.tmux.conf`. To revert to the default: `bind n next-window`
-  (or pick a different key, e.g. `bind C-n run-shell '…'`).
+### Options
+
+| Option | Default | Meaning |
+|---|---|---|
+| `@claudewatch_format` | `#(…/scripts/claude-count.sh)` | Override the status segment command. |
+| `@claudewatch_jump_key` | `n` | Key (under prefix) to cycle all Claude panes. Empty = unbound. |
+| `@claudewatch_jump_blocked_key` | `N` | Key (under prefix) to cycle blocked panes. Empty = unbound. |
+
+> `prefix n` overrides tmux's default `next-window`. Set `@claudewatch_jump_key ''` to keep it.
+
+---
+
+## macOS menu-bar app (optional)
+
+The plugin already surfaces everything inside tmux. Install this only if you also want a
+**menu-bar pill** and **notification banners** that reach you when tmux isn't visible.
+
+```sh
+~/.tmux/plugins/tmux-claudewatch/macos/install.sh
+```
+
+This builds the app and registers a LaunchAgent (starts at login). Re-run after updates.
+
+- **Menu-bar pill** — `🤖<total>` always, plus `🔔<blocked>` / `⚙️<thinking>` when non-zero. The
+  dropdown lists every Claude pane; click one to jump (and raise the terminal).
+- **Notifications** — fire when a pane enters the blocked state (needs `terminal-notifier`:
+  `brew install terminal-notifier`), re-nudging every few minutes while still blocked.
+- **Global hotkeys** — `⌃⌥⌘J` next blocked pane, `⌃⌥⌘N` next Claude pane (any state). Change the
+  codes near the top of `macos/ClaudeTmuxWatcher.swift`.
+
+Uninstall:
+
+```sh
+launchctl bootout gui/$(id -u)/works.vlabs.tmuxclaudewatcher
+rm ~/Library/LaunchAgents/works.vlabs.tmuxclaudewatcher.plist
+```
+
+Logs: `/tmp/tmuxclaudewatcher.log`.
+
+---
 
 ## Notes / limits
 
-- First run, macOS may ask to grant **Notifications** permission to `terminal-notifier`.
-- Clicking a pane switches tmux's focus (`switch-client` / `select-window` / `select-pane`); it does
-  not raise your terminal's GUI window.
-- The blocked signature is tuned to current Claude Code permission and question dialogs. If a future
-  dialog variant drops `Esc to cancel`, adjust `isBlocked()` in `ClaudeTmuxWatcher.swift`.
+- The blocked/thinking signatures are tuned to current Claude Code dialogs. If a future TUI variant
+  drops `Esc to cancel`, adjust `isBlocked()` in `macos/ClaudeTmuxWatcher.swift` and the matching
+  `grep` in `scripts/claude-count.sh` / `scripts/next-blocked.sh`.
+- The macOS app needs the Swift toolchain (`xcode-select --install`); the plugin needs neither.
