@@ -129,7 +129,9 @@ func summarize(_ content: String) -> String {
 
 class App: NSObject, NSApplicationDelegate {
     let status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    var notified = Set<String>()   // pane ids we've already alerted on (this block)
+    var lastNotified: [String: Date] = [:]   // pane id -> last banner time (drives first alert + re-nudge)
+    var blockedSince: [String: Date] = [:]    // pane id -> when it first showed blocked
+    var scanning = false                       // guard against overlapping background scans
     var lastCount = 0
     var lastThinking = 0
     var pulseTimer: Timer?
@@ -201,7 +203,7 @@ class App: NSObject, NSApplicationDelegate {
     func cycleNext() {
         guard !blockedPanes.isEmpty else { return }
         cycleIndex = (cycleIndex + 1) % blockedPanes.count
-        run("/bin/sh", ["-c", switchCommand(blockedPanes[cycleIndex])])
+        focus(blockedPanes[cycleIndex])
     }
 
     // MARK: Settings
@@ -280,19 +282,42 @@ class App: NSObject, NSApplicationDelegate {
         if restore { registerHotKey() }   // re-arm the unchanged hotkey after a cancel
     }
 
+    /// Scan off the main thread (one blocking `capture-pane` per pane), then apply the
+    /// result back on main. Skips if a previous scan hasn't finished.
     func tick() {
-        let result = scan()
+        guard !scanning else { return }
+        scanning = true
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let result = scan()
+            DispatchQueue.main.async {
+                self?.scanning = false
+                self?.apply(result)
+            }
+        }
+    }
+
+    func apply(_ result: ScanResult) {
         let blocked = result.blocked
         lastThinking = result.thinking
-
-        // Fire a banner (and a visual pulse) on each fresh not-blocked -> blocked transition.
+        let now = Date()
         let current = Set(blocked.map { $0.id })
+
+        // First-seen time per blocked pane drives the "blocked Nm" label; drop cleared ones.
+        for p in blocked where blockedSince[p.id] == nil { blockedSince[p.id] = now }
+        blockedSince = blockedSince.filter { current.contains($0.key) }
+
+        // Banner + pulse on the first transition, then re-nudge every `reNudge`s while still blocked.
+        let reNudge: TimeInterval = 180
         var hasNew = false
-        for p in blocked where !notified.contains(p.id) {
-            notify(p)
-            hasNew = true
+        for p in blocked {
+            let last = lastNotified[p.id]
+            if last == nil || now.timeIntervalSince(last!) >= reNudge {
+                notify(p)
+                lastNotified[p.id] = now
+                if last == nil { hasNew = true }
+            }
         }
-        notified = current   // drop cleared panes so they can re-notify later
+        lastNotified = lastNotified.filter { current.contains($0.key) }
 
         render(blocked)
         if hasNew { startPulse() }
@@ -311,7 +336,8 @@ class App: NSObject, NSApplicationDelegate {
             menu.addItem(item)
         } else {
             for p in blocked {
-                let item = NSMenuItem(title: "⚠ \(p.summary)",
+                let age = blockedSince[p.id].map { " · \(elapsed(since: $0))" } ?? ""
+                let item = NSMenuItem(title: "⚠\(age)  \(p.summary)",
                                       action: #selector(switchTo(_:)), keyEquivalent: "")
                 item.target = self
                 item.representedObject = p
@@ -319,9 +345,6 @@ class App: NSObject, NSApplicationDelegate {
             }
         }
         menu.addItem(.separator())
-        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
-        settings.target = self
-        menu.addItem(settings)
         let refresh = NSMenuItem(title: "Refresh now", action: #selector(refresh), keyEquivalent: "r")
         refresh.target = self
         menu.addItem(refresh)
@@ -373,8 +396,8 @@ class App: NSObject, NSApplicationDelegate {
         guard let button = status.button else { return }
         button.attributedTitle = NSAttributedString(string: "")
         if lastCount > 0 {
-            // Blocked takes priority: robot + bell, terracotta (pulses on new).
-            button.image = pill(symbol: WatcherIcon, count: nil,
+            // Blocked takes priority: robot + bell, terracotta (pulses on new). Show count if >1.
+            button.image = pill(symbol: WatcherIcon, count: lastCount > 1 ? lastCount : nil,
                                 bg: pulseBright ? BadgePulseColor : BadgeColor, fg: .white)
         } else if lastThinking > 0 {
             // Thinking: robot + gear, blue.
@@ -422,9 +445,45 @@ class App: NSObject, NSApplicationDelegate {
         + "\(TMUX) select-pane -t '\(p.id)'"
     }
 
+    /// Switch tmux focus to the pane, then raise the GUI terminal hosting it —
+    /// tmux focus alone is invisible if the terminal window is behind other apps.
+    func focus(_ p: BlockedPane) {
+        run("/bin/sh", ["-c", switchCommand(p)])
+        activateTerminalApp(for: p.session)
+    }
+
+    /// Walk from the tmux client's process up the parent chain to the hosting `.app`
+    /// bundle and bring it forward. Best-effort: silently no-ops if nothing matches.
+    func activateTerminalApp(for session: String) {
+        let pidStr = run(TMUX, ["list-clients", "-t", session, "-F", "#{client_pid}"])
+            .split(separator: "\n").first.map(String.init) ?? ""
+        guard var pid = Int32(pidStr.trimmingCharacters(in: .whitespaces)) else { return }
+        for _ in 0..<16 {
+            let line = run("/bin/ps", ["-o", "ppid=,comm=", "-p", "\(pid)"])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let sp = line.firstIndex(of: " ") else { return }
+            let ppid = Int32(String(line[..<sp])) ?? -1
+            let comm = String(line[line.index(after: sp)...]).trimmingCharacters(in: .whitespaces)
+            if comm.contains(".app/Contents/MacOS/") {
+                NSRunningApplication(processIdentifier: pid)?.activate()
+                return
+            }
+            if ppid <= 1 { return }
+            pid = ppid
+        }
+    }
+
+    /// Compact human duration: "8s", "4m", "1h12m".
+    func elapsed(since: Date) -> String {
+        let s = Int(Date().timeIntervalSince(since))
+        if s < 60 { return "\(s)s" }
+        if s < 3600 { return "\(s / 60)m" }
+        return "\(s / 3600)h\((s % 3600) / 60)m"
+    }
+
     @objc func switchTo(_ sender: NSMenuItem) {
         guard let p = sender.representedObject as? BlockedPane else { return }
-        run("/bin/sh", ["-c", switchCommand(p)])
+        focus(p)
     }
 
     @objc func refresh() { tick() }
