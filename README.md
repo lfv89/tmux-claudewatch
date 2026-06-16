@@ -46,9 +46,8 @@ Then hit `prefix + I` to fetch the plugin.
   - `prefix n` → cycle through **every** Claude pane (any state)
   - `prefix N` → cycle through **waiting** panes only
   - `prefix t` → **fzf popup** listing every Claude session with its state and a live
-    preview. From the list: `alt-1`/`alt-2`/`alt-3` answer the highlighted session's prompt
-    and `alt-c` cancels it (the preview refreshes in place); `enter` opens the session in a
-    **live, interactive overlay** for free typing (`prefix d` to return). Needs `fzf`.
+    preview; pick one to open it in a **live, interactive overlay** (answer the agent in
+    place, then `prefix d` to return). Needs `fzf`.
 - **Pane-border tag** — each Claude pane gets a `@claude_waiting` option (`1` when waiting, else
   `0`), so you can restyle the active pane's border, e.g.:
 
