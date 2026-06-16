@@ -16,6 +16,11 @@ if [ "${CW_POPUP:-}" = "1" ]; then
             --info=hidden --no-scrollbar \
             --preview 'tmux capture-pane -ep -t {2}' \
             --preview-window='right,55%,border-left' \
+            --bind 'focus:refresh-preview' \
+            --bind 'alt-1:execute-silent(tmux send-keys -t {2} 1 Enter)+refresh-preview' \
+            --bind 'alt-2:execute-silent(tmux send-keys -t {2} 2 Enter)+refresh-preview' \
+            --bind 'alt-3:execute-silent(tmux send-keys -t {2} 3 Enter)+refresh-preview' \
+            --bind 'alt-c:execute-silent(tmux send-keys -t {2} Escape)+refresh-preview' \
             --color="$FZF_COLORS" < "$CW_ROWS") || exit 0
   [ -n "$sel" ] && printf '%s\t%s\t%s\n' \
     "$(printf '%s' "$sel" | cut -f2)" \
