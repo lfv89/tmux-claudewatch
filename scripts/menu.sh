@@ -47,7 +47,12 @@ rows() {
                  | grep -E '^(Do you want|Would you like)|\?$' | tail -1 | sed 's/^[[:space:]]*//')
       [ -z "$detail" ] && detail="needs a decision"
     elif printf '%s' "$c" | grep -qiE 'esc to interrupt|\([0-9].*tokens?\)'; then
-      rank=1; icon="⚙️"; detail="working…"
+      rank=1; icon="⚙️"
+      # Show the live spinner status (verb + elapsed + tokens), dropping the trailing
+      # "· thinking with high effort" noise; fall back to a generic label.
+      detail=$(printf '%s\n' "$c" | grep -E '\([0-9].*tokens?' | tail -1 \
+                 | sed -E 's/^[^[:alnum:]]*//; s/ · thinking[^)]*\)/)/; s/[[:space:]]*$//')
+      [ -z "$detail" ] && detail="working…"
     else
       rank=2; icon="🤖"; detail="idle"
     fi
