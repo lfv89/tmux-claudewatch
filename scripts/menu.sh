@@ -40,17 +40,21 @@ rows() {
   while IFS=$'\t' read -r s w pi p cmd; do
     [ "$cmd" = "claude" ] || continue
     c=$(tmux capture-pane -p -t "$p" 2>/dev/null) || c=""
-    if printf '%s' "$c" | grep -q 'Esc to cancel' \
-       && printf '%s' "$c" | grep -qE '❯[[:space:]]*[0-9]+\.[[:space:]]+[^[:space:]]'; then
+    # Scope to the live UI region (bottom non-empty lines), not scrolled conversation.
+    ne=$(printf '%s\n' "$c" | grep -vE '^[[:space:]]*$')
+    dlg=$(printf '%s\n' "$ne" | tail -n 10)
+    bot=$(printf '%s\n' "$ne" | tail -n 5)
+    if printf '%s' "$dlg" | grep -q 'Esc to cancel' \
+       && printf '%s' "$dlg" | grep -qE '❯[[:space:]]*[0-9]+\.[[:space:]]+[^[:space:]]'; then
       rank=0; icon="🔔"
-      detail=$(printf '%s\n' "$c" | sed 's/[[:space:]]*$//' \
+      detail=$(printf '%s\n' "$dlg" | sed 's/[[:space:]]*$//' \
                  | grep -E '^(Do you want|Would you like)|\?$' | tail -1 | sed 's/^[[:space:]]*//')
       [ -z "$detail" ] && detail="needs a decision"
-    elif printf '%s' "$c" | grep -qiE 'esc to interrupt|\([0-9].*tokens?\)'; then
+    elif printf '%s' "$bot" | grep -qiE 'esc to interrupt|\([0-9].*tokens?\)'; then
       rank=1; icon="⚙️"
       # Show the live spinner status (verb + elapsed + tokens), dropping the trailing
       # "· thinking with high effort" noise; fall back to a generic label.
-      detail=$(printf '%s\n' "$c" | grep -E '\([0-9].*tokens?' | tail -1 \
+      detail=$(printf '%s\n' "$dlg" | grep -E '\([0-9].*tokens?' | tail -1 \
                  | sed -E 's/^[^[:alnum:]]*//; s/ · thinking[^)]*\)/)/; s/[[:space:]]*$//')
       [ -z "$detail" ] && detail="working…"
     else

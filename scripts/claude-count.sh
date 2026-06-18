@@ -14,11 +14,15 @@ while IFS=$'\t' read -r cmd pid; do
   total=$((total + 1))
   state=0
   c=$(tmux capture-pane -p -t "$pid" 2>/dev/null) || c=""
-  if printf '%s' "$c" | grep -q 'Esc to cancel' \
-     && printf '%s' "$c" | grep -qE '❯[[:space:]]*[0-9]+\.[[:space:]]+[^[:space:]]'; then
+  # Scope to the live UI region (bottom non-empty lines), not scrolled conversation.
+  ne=$(printf '%s\n' "$c" | grep -vE '^[[:space:]]*$')
+  dlg=$(printf '%s\n' "$ne" | tail -n 10)
+  bot=$(printf '%s\n' "$ne" | tail -n 5)
+  if printf '%s' "$dlg" | grep -q 'Esc to cancel' \
+     && printf '%s' "$dlg" | grep -qE '❯[[:space:]]*[0-9]+\.[[:space:]]+[^[:space:]]'; then
     waiting=$((waiting + 1))
     state=1
-  elif printf '%s' "$c" | grep -qiE 'esc to interrupt|\([0-9].*tokens?\)'; then
+  elif printf '%s' "$bot" | grep -qiE 'esc to interrupt|\([0-9].*tokens?\)'; then
     thinking=$((thinking + 1))
   fi
   # Tag the pane so pane-border-format can restyle a waiting active pane.

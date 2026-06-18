@@ -109,18 +109,28 @@ func scan() -> ScanResult {
     return result
 }
 
-func isWaiting(_ content: String) -> Bool {
-    guard content.contains("Esc to cancel") else { return false }
-    let range = NSRange(content.startIndex..., in: content)
-    return menuRegex.firstMatch(in: content, range: range) != nil
+/// The last `n` non-empty lines — the live UI region (input box / dialog / spinner).
+/// Scoping detection here avoids matching the same strings when they appear as scrolled
+/// conversation text higher up (e.g. a pane discussing "(… tokens)" or "Esc to cancel").
+func bottomLines(_ content: String, _ n: Int) -> String {
+    let lines = content.split(whereSeparator: \.isNewline)
+        .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+    return lines.suffix(n).joined(separator: "\n")
 }
 
-/// Actively processing: the spinner shows a token/timer line or "esc to interrupt".
+func isWaiting(_ content: String) -> Bool {
+    let region = bottomLines(content, 10)
+    guard region.contains("Esc to cancel") else { return false }
+    let range = NSRange(region.startIndex..., in: region)
+    return menuRegex.firstMatch(in: region, range: range) != nil
+}
+
+/// Actively processing: the live UI shows a token/timer line or "esc to interrupt".
 func isThinking(_ content: String) -> Bool {
-    let lower = content.lowercased()
-    if lower.contains("esc to interrupt") { return true }
-    let range = NSRange(content.startIndex..., in: content)
-    return thinkingRegex.firstMatch(in: content, range: range) != nil
+    let region = bottomLines(content, 5)
+    if region.lowercased().contains("esc to interrupt") { return true }
+    let range = NSRange(region.startIndex..., in: region)
+    return thinkingRegex.firstMatch(in: region, range: range) != nil
 }
 
 /// Best-effort one-liner: the prompt question above the menu.

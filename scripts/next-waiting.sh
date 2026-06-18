@@ -7,8 +7,10 @@ set -euo pipefail
 sess=(); win=(); pid=()
 while IFS=$'\t' read -r s w p; do
   c=$(tmux capture-pane -p -t "$p" 2>/dev/null) || continue
-  if printf '%s' "$c" | grep -q 'Esc to cancel' \
-     && printf '%s' "$c" | grep -qE '❯[[:space:]]*[0-9]+\.[[:space:]]+[^[:space:]]'; then
+  # Scope to the live UI region (bottom non-empty lines), not scrolled conversation.
+  dlg=$(printf '%s\n' "$c" | grep -vE '^[[:space:]]*$' | tail -n 10)
+  if printf '%s' "$dlg" | grep -q 'Esc to cancel' \
+     && printf '%s' "$dlg" | grep -qE '❯[[:space:]]*[0-9]+\.[[:space:]]+[^[:space:]]'; then
     sess+=("$s"); win+=("$w"); pid+=("$p")
   fi
 done < <(tmux list-panes -a -F '#{session_name}	#{window_index}	#{pane_id}')
