@@ -1,0 +1,30 @@
+name: release
+
+# Build the macOS menu-bar app on a (free, for public repos) macOS runner and
+# attach a zipped .app to a GitHub Release. The installer downloads this so users
+# never need the Swift toolchain. Triggered by pushing a version tag, e.g.:
+#   git tag v1.0.0 && git push origin v1.0.0
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build app bundle
+        run: bash macos/build.sh --app
+
+      - name: Zip the .app
+        working-directory: macos
+        run: ditto -c -k --sequesterRsrc --keepParent ClaudeTmuxWatcher.app ClaudeTmuxWatcher.app.zip
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" macos/ClaudeTmuxWatcher.app.zip --generate-notes

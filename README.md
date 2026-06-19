@@ -80,10 +80,16 @@ The plugin already surfaces everything inside tmux. Install this only if you als
 **menu-bar pill** and **notification banners** that reach you when tmux isn't visible.
 
 ```sh
-~/.tmux/plugins/tmux-claudewatch/macos/install.sh
+curl -fsSL https://raw.githubusercontent.com/lfv89/tmux-claudewatch/main/macos/install.sh | sh
 ```
 
-This builds the app and registers a LaunchAgent (starts at login). Re-run after updates.
+This downloads a prebuilt app (no clone or Swift toolchain needed), installs it to
+`~/Library/Application Support/claudewatch`, and registers a LaunchAgent (starts at login).
+Re-run after updates. The download is unsigned, so the installer clears the Gatekeeper
+quarantine itself — read the script first if that gives you pause.
+
+If you have a checkout already, `~/.tmux/plugins/tmux-claudewatch/macos/install.sh` works too,
+and falls back to building from source (needs `xcode-select --install`) when no release is available.
 
 - **Menu-bar pill** — `🤖<total>` always, plus `🔔<waiting>` / `⚙️<thinking>` when non-zero. The
   dropdown lists every Claude pane; click one to jump (and raise the terminal).
@@ -98,6 +104,7 @@ Uninstall:
 ```sh
 launchctl bootout gui/$(id -u)/works.vlabs.tmuxclaudewatcher
 rm ~/Library/LaunchAgents/works.vlabs.tmuxclaudewatcher.plist
+rm -rf ~/Library/Application\ Support/claudewatch
 ```
 
 Logs: `/tmp/tmuxclaudewatcher.log`.
