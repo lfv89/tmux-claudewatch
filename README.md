@@ -12,7 +12,7 @@ The repo ships two independent pieces:
 | | What | Needs |
 |---|---|---|
 | **tmux plugin** (baseline) | A status-bar segment with live counts (󰚩 total · 󰒓 thinking · 󰂚 waiting) and keys to jump between Claude panes. | just tmux |
-| **macOS menu-bar app** (optional) | A menu-bar pill + notifications that alert you when a pane *enters* the waiting state, even when tmux isn't on screen. | macOS + Swift toolchain |
+| **macOS menu-bar app** (optional) | A menu-bar pill + notifications that alert you when a pane *enters* the waiting state, even when tmux isn't on screen. | macOS (prebuilt; no toolchain) |
 
 Detection is content-based (`tmux capture-pane`): a numbered selection menu (`❯ 1. …`) plus the
 footer `Esc to cancel` means waiting; `esc to interrupt` / a `(… tokens)` line means thinking. No
@@ -67,8 +67,8 @@ Then hit `prefix + I` to fetch the plugin.
 The keys are **unbound by default** — set the options to bind them, e.g.:
 
 ```tmux
-set -g @claudewatch_jump_key 'n'          # note: overrides tmux's default next-window
-set -g @claudewatch_jump_waiting_key 'N'
+set -g @claudewatch_jump_waiting_key 'n'  # note: overrides tmux's default next-window
+set -g @claudewatch_jump_key 'N'
 set -g @claudewatch_menu_key 't'
 ```
 
@@ -116,4 +116,6 @@ Logs: `/tmp/tmuxclaudewatcher.log`.
 - The waiting/thinking signatures are tuned to current Claude Code dialogs. If a future TUI variant
   drops `Esc to cancel`, adjust `isWaiting()` in `macos/ClaudeTmuxWatcher.swift` and the matching
   `grep` in `scripts/claude-count.sh` / `scripts/next-waiting.sh`.
-- The macOS app needs the Swift toolchain (`xcode-select --install`); the plugin needs neither.
+- The macOS app installs from a prebuilt release — no toolchain needed. The Swift toolchain
+  (`xcode-select --install`) is only required for the source-build fallback when running the
+  installer from a checkout with no release available.
